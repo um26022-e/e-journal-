@@ -1,60 +1,93 @@
-"""Builds today's edition of The E Journal and injects it into index.html."""
-import json, os, re, datetime, urllib.request
-import anthropic
+"""Builds today's edition of The E Journal (100% free: RSS + Gemini free tier)."""
+import json, os, re, time, datetime, urllib.request, xml.etree.ElementTree as ET
 
+KEY = os.environ["GEMINI_API_KEY"]
+MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 CITIES = {"Bhubaneswar": (20.2961, 85.8245), "Jaipur": (26.9124, 75.7873)}
-MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-6")
 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 today = datetime.datetime.now(IST)
+
+FEEDS = {
+ "world": ["https://timesofindia.indiatimes.com/rssfeeds/296589292.cms",
+           "https://www.thehindu.com/news/international/feed/"],
+ "india": ["https://timesofindia.indiatimes.com/rssfeeds/-2128936835.cms",
+           "https://www.livemint.com/rss/news"],
+ "business": ["https://www.livemint.com/rss/markets", "https://www.livemint.com/rss/companies",
+              "https://timesofindia.indiatimes.com/rssfeeds/1898055.cms"],
+ "sports": ["https://timesofindia.indiatimes.com/rssfeeds/4719161.cms",
+            "https://www.thehindu.com/sport/feeder/default.rss"],
+}
+
+def get(url):
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (E-Journal bot)"})
+    return urllib.request.urlopen(req, timeout=30).read()
+
+def headlines(urls, n=10):
+    out = []
+    for u in urls:
+        try:
+            root = ET.fromstring(get(u))
+            for it in root.iter("item"):
+                t = (it.findtext("title") or "").strip()
+                d = re.sub(r"<[^>]+>", "", it.findtext("description") or "").strip()[:200]
+                if t: out.append(f"- {t}. {d}")
+                if len([x for x in out]) >= n * len(urls): break
+        except Exception as e:
+            print("feed failed:", u, e)
+    return "\n".join(out[:n * 2])
 
 def weather(city, lat, lon):
     url = (f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
            "&current=temperature_2m&daily=temperature_2m_max,temperature_2m_min,"
            "precipitation_probability_max&timezone=Asia%2FKolkata&forecast_days=7")
-    d = json.load(urllib.request.urlopen(url, timeout=30))
-    D = d["daily"]; days = []
+    d = json.loads(get(url)); D = d["daily"]; days = []
     for i, t in enumerate(D["time"]):
-        day = datetime.date.fromisoformat(t).strftime("%a")
-        days.append([day, round(D["temperature_2m_max"][i]), round(D["temperature_2m_min"][i]),
-                     f'{D["precipitation_probability_max"][i] or 0}%'])
+        days.append([datetime.date.fromisoformat(t).strftime("%a"), round(D["temperature_2m_max"][i]),
+                     round(D["temperature_2m_min"][i]), f'{D["precipitation_probability_max"][i] or 0}%'])
     rain = max(int(x[3][:-1]) for x in days[:3])
-    tip = ("Rain is likely in the next 3 days, carry an umbrella." if rain >= 50
-           else "Mostly dry for the next 3 days.")
+    tip = "Rain is likely in the next 3 days, carry an umbrella." if rain >= 50 else "Mostly dry for the next 3 days."
     return {"city": city, "now": f'Now {round(d["current"]["temperature_2m"])}°C',
             "hi": days[0][1], "lo": days[0][2], "tip": tip, "days": days}
 
 history = json.load(open("jargon_history.json")) if os.path.exists("jargon_history.json") else []
+news = "\n\n".join(f"[{k.upper()} HEADLINES]\n{headlines(v)}" for k, v in FEEDS.items())
 
-prompt = f"""Today is {today:%A, %d %B %Y} in India. Use web search to find today's top stories
-from reputable outlets (e.g. Mint, Times of India, Hindustan Times, The Hindu, BBC, Reuters).
-Write ORIGINAL summaries in simple, plain English for a general reader. Never copy sentences
-from articles. Return ONLY valid JSON, no markdown, with this exact shape:
-{{"world":[{{"h":"headline","s":"2 sentence summary","w":"1-2 sentences explaining it simply and why it matters"}}],
-"india":[...], "business":[...], "sports":[...],
-"case":{{"h":"catchy question-style title","situation":"2 sentences: the new business situation","story":"3-4 sentences: what happened and why, told like a friendly story","lesson":"1-2 sentences: the takeaway"}},
+prompt = f"""Today is {today:%A, %d %B %Y} in India. Below are today's headlines from Indian and
+world newspapers. Using ONLY these, write ORIGINAL summaries in simple, plain English for a general
+reader. Do not copy their wording. Return ONLY valid JSON of this shape:
+{{"world":[{{"h":"headline","s":"2 sentence summary","w":"1-2 sentences explaining simply why it matters"}}],
+"india":[...],"business":[...],"sports":[...],
+"case":{{"h":"catchy question-style title","situation":"2 sentences","story":"3-4 sentences told like a friendly story with a simple analogy, in the style of Finshots","lesson":"1-2 sentences"}},
 "astro":[["Aries","one short line"], ... all 12 signs in order],
 "jargon":{{"term":"","means":"","formula":"","example":"","why":""}}}}
-Give 3 stories each for world, india, business, sports. Business should cover Sensex/Nifty, rupee, and
-notable company or economy news. For "jargon" teach ONE basic marketing concept with a simple example
-in rupees. Do not use any of these already-used terms: {history}. "case" is a Finshots-style case study: pick ONE fresh business or economy situation from today's news and explain it conversationally, with a simple analogy, no jargon. Astro lines are light, positive, generic."""
+Give 3 stories each for world, india, business, sports. "case" = pick ONE business/economy situation
+from the headlines. "jargon" = teach ONE basic marketing concept with a simple example in rupees; do not
+use these used terms: {history}. Astro lines are light, positive and generic.
 
-client = anthropic.Anthropic()
-resp = client.messages.create(
-    model=MODEL, max_tokens=6000,
-    tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 8}],
-    messages=[{"role": "user", "content": prompt}])
-text = "".join(b.text for b in resp.content if b.type == "text")
-data = json.loads(text[text.index("{"): text.rindex("}") + 1])
+{news}"""
+
+body = json.dumps({"contents": [{"parts": [{"text": prompt}]}],
+                   "generationConfig": {"responseMimeType": "application/json", "temperature": 0.6}}).encode()
+url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={KEY}"
+for attempt in range(4):
+    try:
+        req = urllib.request.Request(url, body, {"Content-Type": "application/json"})
+        r = json.load(urllib.request.urlopen(req, timeout=120))
+        text = r["candidates"][0]["content"]["parts"][0]["text"]
+        data = json.loads(text[text.index("{"): text.rindex("}") + 1]); break
+    except Exception as e:
+        print("attempt", attempt, "failed:", e); time.sleep(20)
+else:
+    raise SystemExit("Could not build today's edition; keeping yesterday's page.")
 
 data["date"] = f"{today:%A, %d %B %Y}"
-data["note"] = "Updated automatically every morning. Summaries are AI-written from public news sources."
+data["note"] = "Updated automatically every morning. Summaries are AI-written from public newspaper headlines."
 data["weather"] = [weather(c, *xy) for c, xy in CITIES.items()]
 
 html = open("index.html", encoding="utf-8").read()
 block = "const EDITION = " + json.dumps(data, ensure_ascii=False, indent=1) + ";\n/* ====="
 html = re.sub(r"const EDITION = .*?;\n/\* =====", lambda m: block, html, count=1, flags=re.S)
 open("index.html", "w", encoding="utf-8").write(html)
-
 history.append(data["jargon"]["term"])
 json.dump(history[-365:], open("jargon_history.json", "w"), indent=1)
 print("Edition built for", data["date"])
