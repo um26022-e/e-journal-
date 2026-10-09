@@ -2,25 +2,43 @@
 import json, os, re, time, datetime, urllib.request, xml.etree.ElementTree as ET
 
 KEY = os.environ["GEMINI_API_KEY"]
-MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 CITIES = {"Bhubaneswar": (20.2961, 85.8245), "Jaipur": (26.9124, 75.7873)}
 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 today = datetime.datetime.now(IST)
 
 FEEDS = {
  "world": ["https://timesofindia.indiatimes.com/rssfeeds/296589292.cms",
-           "https://www.thehindu.com/news/international/feed/"],
+           "http://feeds.bbci.co.uk/news/world/rss.xml"],
  "india": ["https://timesofindia.indiatimes.com/rssfeeds/-2128936835.cms",
            "https://www.livemint.com/rss/news"],
  "business": ["https://www.livemint.com/rss/markets", "https://www.livemint.com/rss/companies",
               "https://timesofindia.indiatimes.com/rssfeeds/1898055.cms"],
  "sports": ["https://timesofindia.indiatimes.com/rssfeeds/4719161.cms",
-            "https://www.thehindu.com/sport/feeder/default.rss"],
+            "http://feeds.bbci.co.uk/sport/rss.xml"],
 }
 
 def get(url):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (E-Journal bot)"})
     return urllib.request.urlopen(req, timeout=30).read()
+
+def pick_model():
+    """Asks Google which models exist today and picks the newest normal 'flash' one."""
+    if os.environ.get("GEMINI_MODEL"):
+        return os.environ["GEMINI_MODEL"]
+    d = json.loads(get(f"https://generativelanguage.googleapis.com/v1beta/models?key={KEY}&pageSize=200"))
+    names = [m["name"].split("/")[-1] for m in d.get("models", [])
+             if "generateContent" in m.get("supportedGenerationMethods", [])]
+    print("models available:", names)
+    good = [n for n in names if "flash" in n and not re.search(
+        r"lite|image|tts|live|audio|preview|exp|thinking|robotics|computer|embed", n)]
+    def ver(n):
+        m = re.search(r"(\d+(?:\.\d+)?)", n)
+        return float(m.group(1)) if m else 0
+    good.sort(key=ver, reverse=True)
+    return good[0] if good else (names[0] if names else "gemini-2.5-flash")
+
+MODEL = pick_model()
+print("using model:", MODEL)
 
 def headlines(urls, n=10):
     out = []
@@ -76,7 +94,9 @@ for attempt in range(4):
         text = r["candidates"][0]["content"]["parts"][0]["text"]
         data = json.loads(text[text.index("{"): text.rindex("}") + 1]); break
     except Exception as e:
-        print("attempt", attempt, "failed:", e); time.sleep(20)
+        print("attempt", attempt, "failed:", e)
+        if hasattr(e, "read"): print(e.read().decode()[:500])
+        time.sleep(20)
 else:
     raise SystemExit("Could not build today's edition; keeping yesterday's page.")
 
