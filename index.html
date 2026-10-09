@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The E Journal</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#cfe8fb;--card:#eef7ff;--ink:#14293d;--mute:#4f6a82;--acc:#1565c0;--line:#a9d0ee}
+
+
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 Georgia,'Times New Roman',serif}
+.wrap{max-width:900px;margin:0 auto;padding:0 18px 40px}
+header{text-align:center;border-bottom:3px double var(--ink);padding:24px 0 12px;margin-bottom:8px}
+h1{font-size:clamp(34px,8vw,56px);margin:0;letter-spacing:-1px}
+.meta{font:13px system-ui,sans-serif;color:var(--mute);text-transform:uppercase;letter-spacing:1px;margin-top:6px}
+nav{display:flex;gap:6px;overflow-x:auto;padding:10px 0;border-bottom:1px solid var(--line);position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);z-index:5}
+nav a{font:13px system-ui,sans-serif;white-space:nowrap;padding:5px 12px;border:1px solid var(--line);border-radius:20px;color:var(--ink);text-decoration:none}
+section{margin-top:30px}
+h2{font-size:22px;border-left:5px solid var(--acc);padding-left:10px;margin:0 0 14px}
+.story{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px}
+.story h3{margin:0 0 6px;font-size:19px}
+.story p{margin:4px 0}
+.why{font:14px/1.5 system-ui,sans-serif;color:var(--mute);border-top:1px dashed var(--line);margin-top:8px;padding-top:6px}
+.why b{color:var(--acc)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.wx{font:15px system-ui,sans-serif}.wx .big{font-size:34px;font-family:Georgia,serif}
+.days{display:flex;gap:6px;overflow-x:auto;margin-top:8px}.days div{min-width:62px;text-align:center;border:1px solid var(--line);border-radius:8px;padding:6px;font-size:12px}
+.sign{font:14px/1.5 system-ui,sans-serif;display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)}.sign b{min-width:92px}
+.jargon{background:var(--ink);color:var(--bg);border-radius:12px;padding:20px}
+.jargon h3{margin:0;font-size:28px}.jargon .tag{font:12px system-ui;letter-spacing:2px;text-transform:uppercase;opacity:.7}
+.case{border-left:6px solid var(--acc)}.case .tag{font:12px system-ui;letter-spacing:2px;text-transform:uppercase;color:var(--acc);margin-bottom:4px}
+.note{font:13px system-ui,sans-serif;background:#fff3cd;color:#5c4a00;border-radius:8px;padding:8px 12px;margin-top:14px}
+footer{margin-top:36px;text-align:center;font:12px system-ui,sans-serif;color:var(--mute)}
+</style></head><body><div class="wrap">
+<header><h1>The E Journal</h1><div class="meta" id="date"></div></header>
+<nav id="nav"></nav>
+<div class="note" id="note"></div>
+<main id="main"></main>
+<footer>News is summarised and explained in simple language. Astrology is for entertainment only.</footer>
+</div>
+<script>
+/* ===== EDITION DATA: replace this block each day, nothing else needs to change ===== */
+const EDITION = {
+ date:"Saturday, 10 October 2026",
+ note:"Preview edition: news stories are placeholders showing the layout. The hosted version updates itself every morning.",
+ world:[
+  {h:"Sample: Leaders meet to discuss global trade rules",s:"Trade ministers from several large economies are holding talks on tariffs and supply chains.",w:"Tariffs are taxes on imports. When they rise, imported goods get costlier, which can affect prices in Indian shops too."},
+  {h:"Sample: Climate talks focus on funding for poorer nations",s:"Negotiators are debating how much rich countries should pay to help others cope with climate change.",w:"Countries that polluted most historically are being asked to share the cost for those hit hardest."}
+ ],
+ india:[
+  {h:"Sample: RBI policy keeps borrowing costs in focus",s:"The central bank's decisions on interest rates shape loan EMIs across the country.",w:"If the repo rate falls, home and car loans usually become cheaper; if it rises, EMIs can go up."},
+  {h:"Sample: Festive season boosts demand",s:"Retailers and carmakers expect higher sales during the festival months.",w:"Diwali and Dussehra are the biggest buying periods of the Indian year."}
+ ],
+ business:[
+  {h:"Sample: Sensex and Nifty: how to read the daily move",s:"Indices rise or fall based on how big listed companies perform together.",w:"Think of Nifty as a report card for India's 50 largest companies; green means most did well today."},
+  {h:"Sample: Rupee vs dollar",s:"The rupee's value changes with oil prices and foreign investment.",w:"A weaker rupee makes imports like petrol and phones costlier."}
+ ],
+ sports:[
+  {h:"Sample: Cricket and football fixtures to watch",s:"Check today's major matches and results here.",w:"Add the day's biggest result and why it matters for the series or table."}
+ ],
+ weather:[
+  {city:"Bhubaneswar",now:"Clear, 25°C tonight",hi:33,lo:25,tip:"Hot and dry for the weekend. Rain chances climb from Wednesday (up to 75% by Friday), so keep an umbrella ready mid-week.",days:[["Sat",33,25,"15%"],["Sun",33,24,"0%"],["Mon",33,24,"0%"],["Tue",33,25,"15%"],["Wed",31,25,"55%"],["Thu",30,25,"65%"],["Fri",30,25,"75%"]]},
+  {city:"Jaipur",now:"Clear, 23°C tonight",hi:35,lo:22,tip:"Warm days and pleasant nights with no rain expected this week.",days:[["Sat",35,22,"0%"],["Sun",34,21,"10%"],["Mon",33,22,"0%"],["Tue",34,22,"0%"],["Wed",33,22,"0%"],["Thu",32,22,"15%"],["Fri",31,21,"15%"]]}
+ ],
+ astro:[
+  ["Aries","Energy is high. Finish pending work before starting new things."],["Taurus","A good day to save rather than spend."],["Gemini","Conversations bring useful ideas."],["Cancer","Spend time with family; avoid arguments."],["Leo","Your confidence helps at work."],["Virgo","Organise your schedule for the week ahead."],["Libra","Balance work and rest."],["Scorpio","Stay patient with delays."],["Sagittarius","Learning something new pays off."],["Capricorn","Steady effort gets noticed."],["Aquarius","Reach out to an old friend."],["Pisces","Listen to your instincts, but check facts."]
+ ],
+ case:{h:"Sample: Why did your favourite ₹10 biscuit pack get smaller instead of costlier?",situation:"Wheat, palm oil and packaging got more expensive. But shoppers hate price changes, and ₹10 is a magic price point.",story:"Instead of raising the price to ₹11, the company quietly reduced the biscuits in the pack. The price stayed ₹10, but you got fewer biscuits. This is called shrinkflation.",lesson:"Customers notice price changes far more than size changes. Brands often protect a popular price point and adjust the quantity instead."},
+ jargon:{term:"CAC (Customer Acquisition Cost)",means:"The average money a business spends to win one new customer.",formula:"CAC = total marketing and sales spend ÷ number of new customers",example:"You spend ₹50,000 on ads in a month and gain 100 customers. Your CAC is ₹500.",why:"If a customer brings in less profit than ₹500, you are losing money on every sale. Compare CAC with Lifetime Value (LTV)."}
+};
+/* ================================================================================== */
+const $=id=>document.getElementById(id);
+const sections=[["world","World News"],["india","India Today"],["business","Business and Markets"],["case","Case Study of the Day"],["sports","Sports"],["weather","Weather"],["astro","Daily Astro Chart"],["jargon","Marketing Jargon of the Day"]];
+$("date").textContent=EDITION.date+" · Bhubaneswar / Jaipur edition";
+$("note").textContent=EDITION.note;
+$("nav").innerHTML=sections.map(([k,t])=>`<a href="#${k}">${t}</a>`).join("");
+const story=a=>a.map(x=>`<div class="story"><h3>${x.h}</h3><p>${x.s}</p><div class="why"><b>In simple words:</b> ${x.w}</div></div>`).join("");
+const caseHtml=()=>{const c=EDITION.case;return `<div class="story case"><div class="tag">Case Study</div><h3>${c.h}</h3><p><b>The situation:</b> ${c.situation}</p><p><b>What happened:</b> ${c.story}</p><div class="why"><b>The lesson:</b> ${c.lesson}</div></div>`};
+const body={case:caseHtml(),
+ world:story(EDITION.world),india:story(EDITION.india),business:story(EDITION.business),sports:story(EDITION.sports),
+ weather:`<div class="grid">${EDITION.weather.map(c=>`<div class="story wx"><b>${c.city}</b><div class="big">${c.hi}° / ${c.lo}°C</div>${c.now}<p>${c.tip}</p><div class="days">${c.days.map(d=>`<div><b>${d[0]}</b><br>${d[1]}°/${d[2]}°<br>☔${d[3]}</div>`).join("")}</div></div>`).join("")}</div>`,
+ astro:`<div class="story">${EDITION.astro.map(a=>`<div class="sign"><b>${a[0]}</b><span>${a[1]}</span></div>`).join("")}</div>`,
+ jargon:`<div class="jargon"><div class="tag">Marketing 101</div><h3>${EDITION.jargon.term}</h3><p>${EDITION.jargon.means}</p><p><b>Formula:</b> ${EDITION.jargon.formula}</p><p><b>Example:</b> ${EDITION.jargon.example}</p><p><b>Why it matters:</b> ${EDITION.jargon.why}</p></div>`
+};
+$("main").innerHTML=sections.map(([k,t])=>`<section id="${k}"><h2>${t}</h2>${body[k]}</section>`).join("");
+</script></body></html>
